@@ -17,7 +17,8 @@ export default defineConfig({
       // 将 /api 开头的请求代理到本地 SpringBoot 后端，避免浏览器跨域问题
       // 后端接口地址前缀：http://localhost:8123/api
       '/api': {
-        target: 'http://localhost:8123',
+        // 默认代理到本地 SpringBoot 后端；可用环境变量 VITE_PROXY_TARGET 覆盖（多实例联调用）
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8123',
         changeOrigin: true,
       },
     },

@@ -33,16 +33,21 @@ wcf-ai-agent
 │   ├── advisor      # 提示词与日志增强器（MyLoggerAdvisor、ReReadingAdvisor）
 │   ├── app          # AI 恋爱大师应用 LoveApp
 │   ├── chatmemory   # 基于文件的会话记忆持久化
-│   ├── config       # CORS 等配置
-│   ├── controller   # AI 接口层（同步 / SSE 流式）
+│   ├── config       # CORS、双数据源 + MyBatis（DataSourceConfig / MybatisConfig）等配置
+│   ├── controller   # AI 接口层（同步 / SSE 流式）+ 会话历史接口 ChatSessionController
 │   ├── demo         # 各类大模型调用方式演示（SDK、Spring AI、Ollama、HTTP…）
+│   ├── entity       # 实体：ChatSession / ChatMessage（表 agent_chat_session / agent_chat_message）
+│   ├── mapper       # MyBatis Mapper 接口（SQL 全部在 resources/mapper/*.xml）
 │   ├── rag          # 向量库配置、文档加载、查询增强、检索 Advisor 工厂
+│   ├── service      # 业务层（会话历史 ChatSessionService 等）
 │   ├── tools        # 自定义工具（搜索、抓取、文件、PDF、终端、下载、停止）
 │   └── controller   # HealthController / AiController
 ├── src/main/resources
-│   ├── application.yml          # 主配置（默认激活 local 环境）
-│   ├── application-local.yml    # 本地开发配置
-│   └── application-prod.yml     # 生产配置
+│   ├── application.yml            # 主配置（默认激活 local 环境）
+│   ├── application-local.yml      # 本地开发配置（含 MySQL 会话库 mysql.datasource）
+│   ├── application-prod.yml       # 生产配置
+│   ├── mapper/*.xml               # MyBatis SQL 映射文件
+│   └── sql/agent_chat_schema.sql  # 会话历史建表脚本（启动时自动执行）
 ├── wcf-ai-agent-frontend              # Vue 3 前端「AI 应用广场」
 ├── wcf-image-search-mcp-server        # 自研 MCP 图片搜索服务（SSE）
 └── docs                               # 项目文档
@@ -55,6 +60,8 @@ wcf-ai-agent
 - JDK 21+
 - Maven 3.9+（项目自带 `mvnw`）
 - Node.js 18+（前端）
+- MySQL 8.x（本地会话历史存储，库名 `ai_project`；启动时自动建库建表，
+  连接信息在 `application-local.yml` 的 `mysql.datasource`）
 
 ### 配置密钥
 
@@ -103,6 +110,10 @@ npm run dev
 | `/ai/love_app/chat/server_sent_event` | GET | SSE 结构化（ServerSentEvent）流式对话 |
 | `/ai/love_app/chat/sse_emitter` | GET | SseEmitter 实现的流式对话（3 分钟超时） |
 | `/ai/manus/chat` | GET | YuManus 超级智能体流式对话（`message`） |
+| `/chat/session` | POST | 新建会话（`appKey`：loveApp / manus） |
+| `/chat/session/list` | GET | 会话列表（`appKey`，按最近活跃倒序） |
+| `/chat/session/{id}` | PUT / DELETE | 修改会话标题 / 删除会话（连同消息） |
+| `/chat/session/{id}/messages` | GET / POST | 读取消息 / 追加保存消息 |
 
 完整接口文档：启动后访问 Knife4j 在线文档
 

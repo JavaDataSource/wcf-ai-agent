@@ -19,7 +19,7 @@ function createEventSource(message) {
 <template>
   <ChatRoom
     theme="manus"
-    storage-key="manus"
+    app-key="manus"
     title="AI 超级智能体"
     subtitle="自主规划 · 多工具协同 · 实时输出"
     input-placeholder="请输入你的需求，Enter 发送"

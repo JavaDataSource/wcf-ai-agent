@@ -4,7 +4,7 @@ import ChatRoom from '@/components/ChatRoom.vue'
 /**
  * 页面 1：AI 恋爱大师（粉色温柔风主题）
  * 通过 SSE 调用后端接口：GET /api/ai/love_app/chat/sse?message=xxx&chatId=xxx
- * 会话由 ChatRoom 统一管理（localStorage 持久化），会话 id 即后端的 chatId，
+ * 会话由 ChatRoom 统一管理（后端 MySQL 持久化），会话 id 即后端的 chatId，
  * 同一会话内多轮对话共享上下文，不同会话相互隔离。
  */
 
@@ -22,7 +22,7 @@ function createEventSource(message, chatId) {
 <template>
   <ChatRoom
     theme="love"
-    storage-key="loveApp"
+    app-key="loveApp"
     title="AI 恋爱大师"
     subtitle="你的专属情感顾问"
     tagline="温柔风 · 有情绪回应"

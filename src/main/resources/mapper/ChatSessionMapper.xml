@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wcf.wcfaiagent.mapper.ChatSessionMapper">
+
+    <resultMap id="BaseResultMap" type="ChatSession">
+        <id column="id" property="id"/>
+        <result column="app_key" property="appKey"/>
+        <result column="title" property="title"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- 新增会话 -->
+    <insert id="insert">
+        INSERT INTO agent_chat_session (id, app_key, title, created_at, updated_at)
+        VALUES (#{id}, #{appKey}, #{title}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <!-- 更新会话标题（同时刷新最近活跃时间） -->
+    <update id="updateTitle">
+        UPDATE agent_chat_session
+        SET title = #{title}, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 刷新会话最近活跃时间 -->
+    <update id="updateTime">
+        UPDATE agent_chat_session
+        SET updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 按主键查询 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT id, app_key, title, created_at, updated_at
+        FROM agent_chat_session
+        WHERE id = #{id}
+    </select>
+
+    <!-- 某应用的会话列表（按最近活跃倒序） -->
+    <select id="selectByAppKey" resultMap="BaseResultMap">
+        SELECT id, app_key, title, created_at, updated_at
+        FROM agent_chat_session
+        WHERE app_key = #{appKey}
+        ORDER BY updated_at DESC, created_at DESC
+    </select>
+
+    <!-- 删除会话 -->
+    <delete id="deleteById">
+        DELETE FROM agent_chat_session
+        WHERE id = #{id}
+    </delete>
+</mapper>

@@ -6,7 +6,7 @@ import { useSessions } from '@/composables/useSessions'
 
 /**
  * 通用聊天室组件（页面 1 / 页面 2 复用），仿设计稿的卡片式布局：
- * - 左侧边栏：品牌区 + 新建会话按钮 + 历史会话列表（localStorage 持久化，可切换）；
+ * - 左侧边栏：品牌区 + 新建会话按钮 + 历史会话列表（后端 MySQL 持久化，可切换）；
  * - 右侧聊天区：AI 消息在左（白底气泡 + “AI/♥”头像）、用户消息在右（主题色气泡 + “你”头像），气泡下带时间戳；
  * - 底部：快捷提问 chips + 大输入框 + 渐变发送按钮；
  * - 主题：manus 蓝色科技风（顶部通栏标题、底部通栏输入区）、love 粉色温柔风（品牌在侧边栏、输入区只在聊天列下方）。
@@ -27,8 +27,8 @@ const props = defineProps({
   tagline: { type: String, default: '' },
   /** 主题：manus 蓝色科技风 | love 粉色温柔风 */
   theme: { type: String, default: 'manus' },
-  /** 会话持久化的存储键名，不同应用不能重复 */
-  storageKey: { type: String, required: true },
+  /** 应用标识：会话历史按应用隔离存储（后端 agent_chat_session.app_key），不同应用不能重复 */
+  appKey: { type: String, required: true },
   /** 进入新会话时 AI 的欢迎语 */
   welcomeMessage: { type: String, default: '' },
   /** 输入框占位文案 */
@@ -44,8 +44,8 @@ const props = defineProps({
 const isLoveTheme = computed(() => props.theme === 'love')
 
 // ---------- 会话管理 ----------
-const { sessions, activeId, messages, createTime, newSession, switchSession, touchSession, persistMessages, init } =
-  useSessions(props.storageKey, () => props.welcomeMessage)
+const { sessions, activeId, messages, createTime, newSession, switchSession, touchSession, syncMessages, init } =
+  useSessions(props.appKey, () => props.welcomeMessage)
 
 init()
 
@@ -109,9 +109,9 @@ function handleSend() {
   pendingText = ''
   streamClosed = false
   isStreaming.value = true
-  // 更新会话标题/时间并持久化
+  // 更新会话标题/时间，并把这条用户消息同步到后端
   touchSession(message)
-  persistMessages()
+  syncMessages()
   lastPersistAt = Date.now()
   lastDataAt = Date.now()
   scrollToBottom()
@@ -180,11 +180,11 @@ function flushTypewriter() {
     currentAiMessage.content += pendingText.slice(0, step)
     pendingText = pendingText.slice(step)
     scrollToBottom()
-    // 流式过程中节流持久化（每 2 秒），页面意外关闭也不丢已生成内容
+    // 流式过程中节流同步（每 2 秒），页面意外关闭也不丢已生成内容
     const now = Date.now()
     if (now - lastPersistAt > 2000) {
       lastPersistAt = now
-      persistMessages()
+      syncMessages()
     }
   }
   // 兜底 1：个别场景（如经代理的长连接中断）下连接已关闭但浏览器未触发 onerror，
@@ -251,7 +251,7 @@ function finalizeStream(errorText = '') {
   pendingText = ''
   streamClosed = false
   isStreaming.value = false
-  persistMessages()
+  syncMessages()
   scrollToBottom()
 }
 
@@ -269,19 +269,19 @@ function handleStop() {
 }
 
 /** 新建会话：若正在输出则先结束当前对话 */
-function handleNewSession() {
+async function handleNewSession() {
   finalizeStream()
-  newSession()
+  await newSession()
   scrollToBottom()
 }
 
 /** 切换历史会话 */
-function handleSwitchSession(id) {
+async function handleSwitchSession(id) {
   if (id === activeId.value) {
     return
   }
   finalizeStream()
-  switchSession(id)
+  await switchSession(id)
   scrollToBottom()
 }
 
@@ -304,7 +304,7 @@ function resizeInput() {
   el.style.height = `${Math.min(el.scrollHeight, 160)}px`
 }
 
-// 离开页面时持久化并清理 SSE 连接和打字机定时器
+// 离开页面时同步剩余消息，并清理 SSE 连接和打字机定时器
 onBeforeUnmount(() => {
   if (currentEventSource) {
     currentEventSource.close()
@@ -314,7 +314,7 @@ onBeforeUnmount(() => {
     clearInterval(typeTimer)
     typeTimer = null
   }
-  persistMessages()
+  syncMessages()
 })
 </script>
 

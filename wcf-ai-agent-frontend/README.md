@@ -58,8 +58,9 @@ wcf-ai-agent-frontend
     ├── assets/main.css     # 全局样式
     ├── router/index.js     # 路由：主页 / 恋爱大师 / 超级智能体
     ├── utils/request.js    # Axios 实例（普通接口用）
+    ├── api/chatSession.js  # 会话历史接口（后端 MySQL：agent_chat_session / agent_chat_message）
     ├── composables
-    │   └── useSessions.js  # 会话管理：多会话列表 + localStorage 持久化
+    │   └── useSessions.js  # 会话管理：多会话列表 + 后端 MySQL 追加式同步
     ├── components
     │   └── ChatRoom.vue    # 通用聊天室组件（双主题卡片布局、SSE 流式渲染、打字机、停止、历史会话）
     └── views
@@ -76,9 +77,13 @@ wcf-ai-agent-frontend
   输入区只在聊天列下方），由 `theme` 属性切换；
 - 消息气泡：AI 消息在左（渐变色默认头像：机器人 💠 / 爱心，见 `AppIcon.vue`），
   用户消息在右（“你”头像），气泡内文字统一左对齐，每条消息下方带 `HH:mm` 时间戳；
-- 多会话管理：会话列表持久化在 `localStorage`，支持新建 / 切换 / 刷新后恢复上次会话；
-  会话标题自动取首条用户消息；AI 恋爱大师的会话 id 直接作为后端 `chatId`，
-  同一会话共享上下文，不同会话相互隔离；对话内容也按会话持久化（流式过程中每 2 秒节流保存）；
+- 多会话管理：会话列表与消息持久化在**后端本地 MySQL**（`agent_chat_session` /
+  `agent_chat_message` 表，经 `/api/chat/session/*` 接口读写，Controller / Service /
+  MyBatis Mapper XML 分层），支持新建 / 切换 / 刷新后恢复最近会话，换浏览器或清空
+  浏览器数据也不丢失；会话标题自动取首条用户消息；AI 恋爱大师的会话 id 直接作为后端
+  `chatId`，同一会话共享上下文，不同会话相互隔离；消息采用“追加式”同步
+  （流式过程中每 2 秒节流保存增量，欢迎语不入库）；后端不可用时自动降级为内存会话，
+  聊天功能不受影响；
 - SSE 流式渲染：AI 回复以“打字机”效果（30ms 自适应速率）逐段显示，支持随时「停止」；
 - 分气泡模式（`per-event-bubble`）：Manus 的每条 SSE 消息对应一个执行步骤，独占一个气泡；
 - 健壮性收尾（三层保障）：
