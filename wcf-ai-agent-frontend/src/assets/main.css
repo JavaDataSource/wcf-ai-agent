@@ -1,4 +1,5 @@
 :root {
+  /* ---------- 设计令牌：全站统一 ---------- */
   --color-bg: #f5f7fb;
   --color-surface: #ffffff;
   --color-text: #1f2329;
@@ -10,6 +11,11 @@
   --radius-lg: 16px;
   --shadow-card: 0 10px 30px rgba(31, 35, 41, 0.08);
   --font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  /* 极客风等宽字体（主页、代码感元素使用） */
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+  /* 全局页脚高度（聊天页卡片高度计算用） */
+  --footer-height: 56px;
+  --footer-height-mobile: 96px;
 }
 
 * {
@@ -60,4 +66,21 @@ button {
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* 文本选中配色（配合极客风主题） */
+::selection {
+  background: rgba(56, 189, 248, 0.35);
+  color: #fff;
+}
+
+/* 尊重系统“减少动态效果”设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

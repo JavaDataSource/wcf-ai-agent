@@ -3,8 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI 应用广场</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- SEO 基础信息（路由切换时由 router.afterEach 按页面动态更新） -->
+    <title>AI 应用广场 | AI 恋爱大师 · AI 超级智能体</title>
+    <meta
+      name="description"
+      content="AI 应用广场：与 AI 恋爱大师聊聊情感话题、写表白情书，或让 AI 超级智能体 Manus 自主规划任务、调用工具帮你完成复杂工作，全程 SSE 流式输出。基于 Vue 3 + Spring AI 构建。"
+    />
+    <meta
+      name="keywords"
+      content="AI 应用,AI 恋爱大师,AI 超级智能体,Manus,智能体,Spring AI,Vue 3,SSE 流式,聊天机器人,工具调用,情感顾问"
+    />
+    <meta name="author" content="wcf" />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#05070d" />
+
+    <!-- Open Graph：社交平台分享卡片 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AI 应用广场" />
+    <meta property="og:title" content="AI 应用广场 | AI 恋爱大师 · AI 超级智能体" />
+    <meta
+      property="og:description"
+      content="与 AI 恋爱大师聊聊情感话题，或让 AI 超级智能体 Manus 自主规划任务、调用工具帮你完成复杂工作，全程 SSE 流式输出。"
+    />
+    <meta property="og:locale" content="zh_CN" />
+
+    <!-- Twitter 卡片 -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="AI 应用广场 | AI 恋爱大师 · AI 超级智能体" />
+    <meta
+      name="twitter:description"
+      content="与 AI 恋爱大师聊聊情感话题，或让 AI 超级智能体 Manus 自主规划任务、调用工具帮你完成复杂工作。"
+    />
+
+    <!-- 结构化数据：帮助搜索引擎理解站点结构 -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "AI 应用广场",
+        "inLanguage": "zh-CN",
+        "description": "汇集 AI 恋爱大师与 AI 超级智能体 Manus 的 AI 应用集合，全程 SSE 流式输出。",
+        "hasPart": [
+          {
+            "@type": "WebApplication",
+            "name": "AI 恋爱大师",
+            "url": "/love-app",
+            "applicationCategory": "ChatApplication",
+            "description": "你的专属情感顾问：陪你聊恋爱话题、出主意、写情书，SSE 流式对话。"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "AI 超级智能体",
+            "url": "/manus",
+            "applicationCategory": "ChatApplication",
+            "description": "基于 Manus 的自主智能体：自主规划任务、调用多种工具，实时输出执行步骤。"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

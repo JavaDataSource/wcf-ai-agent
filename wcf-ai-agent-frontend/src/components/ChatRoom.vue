@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 
+import AppIcon from '@/components/AppIcon.vue'
 import { useSessions } from '@/composables/useSessions'
 
 /**
@@ -323,20 +324,29 @@ onBeforeUnmount(() => {
       <!-- 顶部通栏（Manus 主题：品牌区放顶部） -->
       <header v-if="!isLoveTheme" class="top-header">
         <div class="brand">
-          <div class="brand-logo">AI</div>
+          <div class="brand-logo">
+            <AppIcon type="bot" :size="22" />
+          </div>
           <div class="brand-text">
             <h1>{{ title }}</h1>
             <p>{{ subtitle }}</p>
           </div>
         </div>
-        <button class="ghost-btn" type="button" @click="handleNewSession">新建对话</button>
+        <div class="header-actions">
+          <router-link class="home-btn" to="/" aria-label="返回主页">
+            <AppIcon type="home" :size="18" />
+          </router-link>
+          <button class="ghost-btn" type="button" @click="handleNewSession">新建对话</button>
+        </div>
       </header>
 
       <div class="shell-body">
         <!-- 左侧边栏：新建会话 + 历史会话列表 -->
         <aside class="sidebar">
           <div v-if="isLoveTheme" class="brand">
-            <div class="brand-logo">♥</div>
+            <div class="brand-logo">
+              <AppIcon type="heart" :size="24" />
+            </div>
             <div class="brand-text">
               <h1>{{ title }}</h1>
               <p>{{ subtitle }}</p>
@@ -372,14 +382,21 @@ onBeforeUnmount(() => {
               <h2>{{ activeSessionTitle }}</h2>
               <p v-if="tagline">{{ tagline }}</p>
             </div>
-            <button class="ghost-btn" type="button" @click="handleNewSession">重新开始</button>
+            <div class="header-actions">
+              <router-link class="home-btn" to="/" aria-label="返回主页">
+                <AppIcon type="home" :size="18" />
+              </router-link>
+              <button class="ghost-btn" type="button" @click="handleNewSession">重新开始</button>
+            </div>
           </header>
 
           <!-- 聊天记录：用户在右，AI 在左 -->
           <section ref="messageListRef" class="chat-messages">
             <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="msg.role">
               <div class="avatar" :class="msg.role">
-                {{ msg.role === 'user' ? '你' : isLoveTheme ? '♥' : 'AI' }}
+                <!-- AI 默认头像：Manus 用机器人、恋爱大师用爱心；用户展示“你” -->
+                <AppIcon v-if="msg.role === 'ai'" :type="isLoveTheme ? 'heart' : 'bot'" :size="20" />
+                <template v-else>你</template>
               </div>
               <div class="msg-col">
                 <div class="bubble" :class="{ error: msg.error }">
@@ -427,7 +444,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .chat-page {
-  min-height: 100vh;
+  --sidebar-w: 272px;
   padding: 24px;
   display: flex;
 }
@@ -469,7 +486,9 @@ onBeforeUnmount(() => {
 .shell {
   flex: 1;
   max-width: 1180px;
-  height: calc(100vh - 48px);
+  /* 高度 = 视口 - 全局页脚 - 上下内边距，保证页脚可见且聊天区内部滚动 */
+  height: calc(100vh - var(--footer-height) - 48px);
+  min-height: 420px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -510,15 +529,9 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-weight: 700;
-  font-size: 16px;
   background: var(--accent-grad);
   flex-shrink: 0;
   user-select: none;
-}
-
-.theme-love .brand-logo {
-  font-size: 22px;
 }
 
 .brand-text h1 {
@@ -528,13 +541,13 @@ onBeforeUnmount(() => {
 
 .brand-text p {
   font-size: 12px;
-  color: #9aa0ad;
+  color: #6b7280;
   margin-top: 2px;
 }
 
 /* ---------- 侧边栏 ---------- */
 .sidebar {
-  width: 272px;
+  width: var(--sidebar-w);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -583,7 +596,7 @@ onBeforeUnmount(() => {
 
 .history-label {
   font-size: 12px;
-  color: #a8adb9;
+  color: #646a75;
   padding: 0 4px;
 }
 
@@ -639,7 +652,7 @@ onBeforeUnmount(() => {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: #b3b8c2;
+  color: #646a75;
 }
 
 .home-link {
@@ -648,7 +661,7 @@ onBeforeUnmount(() => {
   padding: 10px;
   border-radius: 10px;
   font-size: 13px;
-  color: #9aa0ad;
+  color: #6b7280;
   transition: all 0.2s;
 }
 
@@ -737,11 +750,6 @@ onBeforeUnmount(() => {
 .avatar.ai {
   background: var(--accent-grad);
   color: #fff;
-  font-size: 15px;
-}
-
-.theme-love .avatar.ai {
-  font-size: 20px;
 }
 
 .avatar.user {
@@ -789,6 +797,8 @@ onBeforeUnmount(() => {
 .bubble-text {
   font-size: 15px;
   line-height: 1.75;
+  /* AI 与用户的文字统一在气泡内左对齐 */
+  text-align: left;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -796,7 +806,7 @@ onBeforeUnmount(() => {
 .msg-time {
   margin-top: 6px;
   font-size: 12px;
-  color: #aab0bb;
+  color: #6f7680;
 }
 
 /* 打字动画 */
@@ -846,7 +856,7 @@ onBeforeUnmount(() => {
 
 /* love 主题：品牌在侧边栏，输入区只覆盖聊天列 */
 .theme-love .input-area {
-  margin-left: 272px;
+  margin-left: var(--sidebar-w);
 }
 
 .chips {
@@ -903,7 +913,7 @@ onBeforeUnmount(() => {
 }
 
 .chat-input::placeholder {
-  color: #b6bcc8;
+  color: #8a93a6;
 }
 
 .send-btn {
@@ -929,17 +939,52 @@ onBeforeUnmount(() => {
   background: linear-gradient(135deg, #ff9d6b 0%, #ff6b6b 100%);
 }
 
+/* ---------- 顶部/会话标题栏右侧操作区 ---------- */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* 返回主页按钮：桌面端侧边栏已有入口，默认隐藏；小屏侧边栏隐藏时展示 */
+.home-btn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ghost-border);
+  color: var(--ghost-color);
+  background: #fff;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.home-btn:hover {
+  border-color: var(--page-accent);
+  color: var(--page-accent);
+}
+
 /* ---------- 小屏适配 ---------- */
-@media (max-width: 860px) {
+@media (max-width: 1024px) {
+  /* 平板：收窄侧边栏 */
   .chat-page {
-    padding: 12px;
+    --sidebar-w: 224px;
   }
 
-  .shell {
-    height: calc(100vh - 24px);
-    border-radius: 16px;
+  .sidebar {
+    padding: 16px 12px 12px;
   }
 
+  .msg-col {
+    max-width: 82%;
+  }
+}
+
+@media (max-width: 768px) {
+  /* 手机/小平板：隐藏侧边栏，会话操作走顶部按钮 */
   .sidebar {
     display: none;
   }
@@ -948,12 +993,90 @@ onBeforeUnmount(() => {
     margin-left: 0;
   }
 
+  .home-btn {
+    display: flex;
+  }
+
   .msg-col {
-    max-width: 86%;
+    max-width: 88%;
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-page {
+    padding: 12px;
+  }
+
+  .shell {
+    height: calc(100vh - var(--footer-height-mobile) - 24px);
+    min-height: 380px;
+    border-radius: 16px;
+  }
+
+  .top-header,
+  .main-header {
+    padding: 12px 16px;
   }
 
   .brand-text p {
     display: none;
+  }
+
+  .ghost-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .chat-messages {
+    padding: 18px 14px 10px;
+  }
+
+  .message-row {
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .bubble {
+    padding: 11px 14px;
+  }
+
+  .bubble-text {
+    font-size: 14px;
+  }
+
+  .input-area {
+    padding: 10px 14px 14px;
+  }
+
+  /* 快捷提问横向滑动 */
+  .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chips button {
+    flex-shrink: 0;
+  }
+
+  .input-bar {
+    padding: 8px 8px 8px 16px;
+    border-radius: 16px;
+  }
+
+  .send-btn {
+    padding: 11px 22px;
+    font-size: 14px;
   }
 }
 </style>
