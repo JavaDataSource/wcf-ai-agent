@@ -5,8 +5,8 @@
 | 页面 | 路由 | 说明 |
 | --- | --- | --- |
 | 主页 | `/` | 应用入口，切换不同应用 |
-| AI 恋爱大师 | `/love-app` | 聊天室风格，SSE 调用 `doChatWithLoveAppSse`，进入页面自动生成聊天室 id |
-| AI 超级智能体 | `/manus` | 聊天室风格，SSE 调用 `doChatWithManus`，实时展示智能体输出 |
+| AI 恋爱大师 | `/love-app` | 粉色温柔风卡片布局，SSE 调用 `doChatWithLoveAppSse`，会话 id 即后端 `chatId` |
+| AI 超级智能体 | `/manus` | 蓝色科技风卡片布局，SSE 调用 `doChatWithManus`，每个执行步骤单独一个气泡 |
 
 ## 技术选型
 
@@ -58,19 +58,34 @@ wcf-ai-agent-frontend
     ├── assets/main.css     # 全局样式
     ├── router/index.js     # 路由：主页 / 恋爱大师 / 超级智能体
     ├── utils/request.js    # Axios 实例（普通接口用）
+    ├── composables
+    │   └── useSessions.js  # 会话管理：多会话列表 + localStorage 持久化
     ├── components
-    │   └── ChatRoom.vue    # 通用聊天室组件（SSE 流式渲染、打字动画、停止/新建会话）
+    │   └── ChatRoom.vue    # 通用聊天室组件（双主题卡片布局、SSE 流式渲染、打字机、停止、历史会话）
     └── views
         ├── HomeView.vue    # 主页：应用切换入口
-        ├── LoveAppChat.vue # 页面 1：AI 恋爱大师（自动生成会话 id）
-        └── ManusChat.vue   # 页面 2：AI 超级智能体
+        ├── LoveAppChat.vue # 页面 1：AI 恋爱大师（love 主题，合并流式模式）
+        └── ManusChat.vue   # 页面 2：AI 超级智能体（manus 主题，per-event-bubble 分气泡模式）
 ```
 
 ## 功能说明
 
-- 聊天室布局：聊天记录在上方（用户消息靠右、AI 消息靠左），输入框在下方；
-- SSE 流式渲染：AI 回复以“打字机”效果逐段显示，支持随时「停止」；
-- 会话隔离：AI 恋爱大师进入页面自动生成 `chatId`（存在 `sessionStorage`，
-  同一标签页刷新不丢失），点「新建会话」可重新生成并清空记录；
+- 卡片式布局（仿设计稿）：页面背景 + 居中圆角卡片，左侧边栏（品牌区 / 新建会话按钮 /
+  历史会话列表）+ 右侧聊天区 + 底部快捷提问与输入区；
+  两个主题：`manus`（顶部通栏品牌 + 通栏输入区）、`love`（品牌在侧边栏、
+  输入区只在聊天列下方），由 `theme` 属性切换；
+- 消息气泡：AI 消息在左（渐变色“AI/♥”头像 + 白底气泡），用户消息在右（主题色气泡 +
+  “你”头像），每条消息下方带 `HH:mm` 时间戳；
+- 多会话管理：会话列表持久化在 `localStorage`，支持新建 / 切换 / 刷新后恢复上次会话；
+  会话标题自动取首条用户消息；AI 恋爱大师的会话 id 直接作为后端 `chatId`，
+  同一会话共享上下文，不同会话相互隔离；对话内容也按会话持久化（流式过程中每 2 秒节流保存）；
+- SSE 流式渲染：AI 回复以“打字机”效果（30ms 自适应速率）逐段显示，支持随时「停止」；
+- 分气泡模式（`per-event-bubble`）：Manus 的每条 SSE 消息对应一个执行步骤，独占一个气泡；
+- 健壮性收尾（三层保障）：
+  1. 后端在流结束前发送 `[DONE]` 结束标记，前端收到后主动关闭连接
+     （避免 EventSource 自动重连导致智能体被重复执行，见后端 `BaseAgent.runStream`）；
+  2. `onerror` 统一收尾（连接异常 / 服务端正常关闭）；
+  3. 前端兜底看门狗：定时检测 `readyState === CLOSED`，以及连接空闲超过 3 分钟
+     无数据时主动断开，界面不会卡在“输出中”；
 - 体验细节：Enter 发送 / Shift+Enter 换行、输入框高度自适应、消息区自动滚动到底部、
-  连接异常与后端未启动的错误提示、快捷提问。
+  连接异常与后端未启动的错误提示、空会话快捷提问、小屏自适应。

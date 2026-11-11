@@ -142,6 +142,9 @@ public abstract class BaseAgent {
                     results.add("Terminated: Reached max steps (" + maxSteps + ")");
                     sseEmitter.send("执行结束：达到最大步骤（" + maxSteps + "）");
                 }
+                // 发送流式结束标记：前端收到后主动关闭连接，
+                // 避免 EventSource 在流结束后自动重连、导致智能体被重复执行
+                sseEmitter.send("[DONE]");
                 // 正常完成
                 sseEmitter.complete();
             } catch (Exception e) {
@@ -149,6 +152,8 @@ public abstract class BaseAgent {
                 log.error("error executing agent", e);
                 try {
                     sseEmitter.send("执行错误：" + e.getMessage());
+                    // 异常结束同样发送结束标记
+                    sseEmitter.send("[DONE]");
                     sseEmitter.complete();
                 } catch (IOException ex) {
                     sseEmitter.completeWithError(ex);
