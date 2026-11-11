@@ -146,11 +146,12 @@
             <type>pom</type>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.itextpdf/font-asian -->
+        <!-- 注意：必须保持默认 compile scope，运行时才会加载 STSongStd-Light 等内置中文字体；
+             若声明为 test scope，主应用运行时会报 "Type of font STSongStd-Light is not recognized" -->
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>font-asian</artifactId>
             <version>9.1.0</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>cn.hutool</groupId>

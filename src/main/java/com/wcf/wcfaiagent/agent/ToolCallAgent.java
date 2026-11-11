@@ -18,6 +18,7 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.ToolCallback;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -40,6 +41,10 @@ public class ToolCallAgent extends ReActAgent {
 
     // 禁用Spring AI 内置的工具调用机制，自己维护选项和消息上下文
     private final ChatOptions chatOptions;
+
+    // 单个工具返回结果的最大长度（超出部分截断）。实测一次网页抓取返回过 200 万+ 字符，
+    // 直接塞进对话会撑爆大模型上下文，导致模型"跑偏"、反复乱调工具直到耗尽最大步数
+    private static final int MAX_TOOL_RESULT_LENGTH = 8000;
 
     public ToolCallAgent(ToolCallback[] availableTools) {
         super();
@@ -121,20 +126,49 @@ public class ToolCallAgent extends ReActAgent {
         Prompt prompt = new Prompt(getMessageList(), this.chatOptions);
         ToolExecutionResult toolExecutionResult = toolCallingManager.executeToolCalls(prompt, toolCallChatResponse);
         // 记录消息上下文，conversationHistory 已经包含了助手消息和工具调用返回的结果
-        setMessageList(toolExecutionResult.conversationHistory());
-        ToolResponseMessage toolResponseMessage = (ToolResponseMessage) CollUtil.getLast(toolExecutionResult.conversationHistory());
+        List<Message> history = new ArrayList<>(toolExecutionResult.conversationHistory());
+        ToolResponseMessage toolResponseMessage = (ToolResponseMessage) CollUtil.getLast(history);
+        // 截断过长的工具返回结果（同时影响回传给大模型的上下文与前端展示），
+        // 避免超长网页内容把模型上下文撑爆
+        List<ToolResponseMessage.ToolResponse> responses = toolResponseMessage.getResponses();
+        if (responses.stream().anyMatch(response -> response.responseData() != null
+                && response.responseData().length() > MAX_TOOL_RESULT_LENGTH)) {
+            responses = responses.stream()
+                    .map(response -> new ToolResponseMessage.ToolResponse(
+                            response.id(), response.name(), truncateResult(response.responseData())))
+                    .toList();
+            toolResponseMessage = new ToolResponseMessage(responses);
+            history.set(history.size() - 1, toolResponseMessage);
+            setMessageList(history);
+        } else {
+            setMessageList(history);
+        }
         // 判断是否调用了终止工具
-        boolean terminateToolCalled = toolResponseMessage.getResponses().stream()
+        boolean terminateToolCalled = responses.stream()
                 .anyMatch(response -> response.name().equals("doTerminate"));
         if (terminateToolCalled) {
             // 任务结束，更改状态
             setState(AgentState.FINISHED);
         }
-        String results = toolResponseMessage.getResponses().stream()
+        String results = responses.stream()
                 .map(response -> "工具 " + response.name() + " 返回的结果：" + response.responseData())
                 .collect(Collectors.joining("\n"));
         log.info(results);
         return results;
+    }
+
+    /**
+     * 截断超长的工具返回结果，并追加截断提示。
+     * 注意：工具结果此时已被 Spring AI JSON 编码成字符串字面量，截断点落在引号内，
+     * 前端解码时会补齐结尾引号（详见前端 decodeToolPayload 的容错逻辑）；
+     * 提示文本中不能包含真实换行等控制字符，否则 JSON 字面量非法、前端无法解码。
+     */
+    private String truncateResult(String data) {
+        if (data == null || data.length() <= MAX_TOOL_RESULT_LENGTH) {
+            return data;
+        }
+        return data.substring(0, MAX_TOOL_RESULT_LENGTH)
+                + " ...[结果过长已截断，原始长度 " + data.length() + " 字符]";
     }
 
 }

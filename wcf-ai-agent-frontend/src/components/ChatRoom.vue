@@ -304,6 +304,182 @@ function resizeInput() {
   el.style.height = `${Math.min(el.scrollHeight, 160)}px`
 }
 
+// ---------- 工具结果富文本渲染（AI 超级智能体的步骤日志） ----------
+// 匹配 "Step N: 工具 xxx 返回的结果：" 段落标记（捕获步骤序号与工具名）。
+// 同一步骤内模型调用多个工具时，act() 会把多个工具结果用换行拼接，
+// 第二个工具结果没有 Step 前缀，因此也要匹配行首的 "工具 xxx 返回的结果："（次级标记）
+const STEP_TOOL_RE = /Step\s*(\d+)\s*[:：]\s*工具\s*([\w-]+)\s*返回的结果\s*[:：]?\s*|\n工具\s*([\w-]+)\s*返回的结果\s*[:：]?\s*/g
+
+/** 把字面量 \n 转成真实换行（工具返回的 JSON/HTML 里常带转义换行） */
+function unescapeNewlines(text) {
+  return (text || '').replace(/\\n/g, '\n')
+}
+
+/** 气泡纯文本显示：未开启结构化渲染时也保证 \n 换行 */
+function displayText(content) {
+  return unescapeNewlines(content)
+}
+
+/** 把气泡内容解析为结构化块；没有工具步骤标记时返回 null，走纯文本渲染 */
+function parseBlocks(content) {
+  if (!content) {
+    return null
+  }
+  const markers = []
+  let m
+  STEP_TOOL_RE.lastIndex = 0
+  while ((m = STEP_TOOL_RE.exec(content)) !== null) {
+    markers.push({
+      index: m.index,
+      end: m.index + m[0].length,
+      step: m[1] || '',
+      tool: m[2] || m[3],
+    })
+  }
+  if (!markers.length) {
+    return null
+  }
+  // 次级标记（同一步骤内的其他工具结果）沿用最近一次出现的步骤号
+  let lastStep = ''
+  markers.forEach((marker) => {
+    if (marker.step) {
+      lastStep = marker.step
+    } else {
+      marker.step = lastStep
+    }
+  })
+  const blocks = []
+  if (markers[0].index > 0) {
+    blocks.push({ type: 'text', text: unescapeNewlines(content.slice(0, markers[0].index).trim()) })
+  }
+  markers.forEach((cur, i) => {
+    const next = markers[i + 1]
+    const payload = content.slice(cur.end, next ? next.index : content.length).trim()
+    blocks.push(buildToolBlock(cur.step, cur.tool, payload))
+  })
+  return blocks
+}
+
+/**
+ * Spring AI 会把所有工具返回值统一 JSON 编码（DefaultToolCallResultConverter → JsonParser.toJson），
+ * 因此前端拿到的 payload 是形如 "..." 的 JSON 字符串字面量：内部引号、换行均被转义。
+ * 这里先解码还原为真实内容；不是 JSON 字面量时原样返回。
+ */
+function decodeToolPayload(payload) {
+  const text = (payload || '').trim()
+  if (!text.startsWith('"')) {
+    return text
+  }
+  try {
+    return JSON.parse(text)
+  } catch (error) {
+    // 解码失败有两种可能：打字机输出中 JSON 尚未传完（忽略即可，按原文展示）；
+    // 或后端对超长结果做了截断、结尾引号丢失（结尾形如 "...[结果过长已截断...]"）。
+    // 后者补齐结尾引号后重试；仍失败则按原文展示
+    if (!text.endsWith('"')) {
+      try {
+        // 去掉末尾可能残缺的转义序列（如被截断在转义符中间的孤立反斜杠）
+        const cleaned = text.replace(/\\+$/, (slashes) => (slashes.length % 2 ? slashes.slice(0, -1) : slashes))
+        return JSON.parse(cleaned + '"')
+      } catch (error2) {
+        return text
+      }
+    }
+    return text
+  }
+}
+
+/** 按工具名分发解析：searchWeb -> 搜索结果卡片；scrapeWebPage -> 网页卡片；其余 -> 纯文本 */
+function buildToolBlock(step, tool, rawPayload) {
+  const payload = decodeToolPayload(rawPayload)
+  const lower = tool.toLowerCase()
+  if (lower === 'searchweb') {
+    const items = parseSearchResults(payload)
+    if (items) {
+      return { type: 'search', step, tool, items }
+    }
+  }
+  if (lower === 'scrapewebpage') {
+    const page = parseWebPage(payload)
+    if (page) {
+      return { type: 'webpage', step, tool, ...page }
+    }
+  }
+  return { type: 'tool', step, tool, text: unescapeNewlines(payload) }
+}
+
+/**
+ * 解析 searchWeb 结果：多个 JSON 对象以逗号连接（工具返回未包数组的 {...},{...}）
+ * 提取 title / link / displayed_link / snippet / snippet_highlighted_words 关键字段
+ */
+function parseSearchResults(payload) {
+  let jsonText = payload.trim()
+  if (!jsonText.startsWith('[')) {
+    jsonText = `[${jsonText}]`
+  }
+  try {
+    const arr = JSON.parse(jsonText)
+    if (!Array.isArray(arr)) {
+      return null
+    }
+    const items = arr
+      .map((it) => {
+        const rawLink = typeof it.link === 'string' ? it.link : ''
+        return {
+          title: typeof it.title === 'string' ? it.title : '',
+          link: /^https?:\/\//i.test(rawLink) ? rawLink : '',
+          source: typeof it.displayed_link === 'string' ? it.displayed_link : '',
+          snippet: typeof it.snippet === 'string' ? it.snippet : '',
+          highlights: Array.isArray(it.snippet_highlighted_words) ? it.snippet_highlighted_words : [],
+        }
+      })
+      .filter((it) => it.title || it.link || it.snippet)
+    return items.length ? items : null
+  } catch (error) {
+    // 打字机过程中 JSON 尚不完整，或返回异常文本时走纯文本兜底
+    return null
+  }
+}
+
+/** 解析 scrapeWebPage 结果：提取网页地址 / 标题 / 纯文本摘要 */
+function parseWebPage(payload) {
+  const isHtml = /<html[\s>]/i.test(payload) || /<!doctype html/i.test(payload)
+  if (!isHtml) {
+    return null
+  }
+  // 地址优先取后端返回的 [网页地址] 头部行；历史消息从 HTML 里兜底提取
+  const urlMatch =
+    payload.match(/^\s*\[网页地址\]\s*(\S+)/m) ||
+    payload.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i) ||
+    payload.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i) ||
+    payload.match(/(https?:\/\/[^\s"'<>()\\]+)/)
+  const titleMatch = payload.match(/^\s*\[网页标题\]\s*(.+)/m) || payload.match(/<title>([^<]*)<\/title>/i)
+  // 摘要前先剔除元信息行，避免预览里混入地址/标题头部
+  const body = payload.replace(/^\s*\[(网页地址|网页标题)\][^\n]*$/gm, '').trim()
+  return {
+    url: urlMatch ? urlMatch[1] : '',
+    title: titleMatch ? titleMatch[1].trim() : '',
+    excerpt: htmlToExcerpt(body, 300),
+  }
+}
+
+/** 去掉 HTML 标签和脚本样式，生成一段纯文本预览 */
+function htmlToExcerpt(html, maxLen) {
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text
+}
+
 // 离开页面时同步剩余消息，并清理 SSE 连接和打字机定时器
 onBeforeUnmount(() => {
   if (currentEventSource) {
@@ -400,7 +576,70 @@ onBeforeUnmount(() => {
               </div>
               <div class="msg-col">
                 <div class="bubble" :class="{ error: msg.error }">
-                  <div class="bubble-text">{{ msg.content }}</div>
+                  <!-- 完成且可解析：工具结果渲染为结构化富文本（搜索卡片 / 网页卡片） -->
+                  <div
+                    v-if="msg.role === 'ai' && !msg.loading && !msg.error && parseBlocks(msg.content)"
+                    class="bubble-text rich-text"
+                  >
+                    <template v-for="(block, bi) in parseBlocks(msg.content)" :key="bi">
+                      <div v-if="block.type === 'text'" class="seg-text">{{ block.text }}</div>
+
+                      <!-- searchWeb：搜索结果卡片，多条之间间隔一行 -->
+                      <div v-else-if="block.type === 'search'" class="tool-block">
+                        <div class="tool-title">Step {{ block.step }} · 🔍 工具 {{ block.tool }} · 联网搜索结果</div>
+                        <div v-for="(item, ii) in block.items" :key="ii" class="search-item">
+                          <a
+                            v-if="item.link"
+                            class="search-title"
+                            :href="item.link"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >{{ item.title || item.link }}</a>
+                          <span v-else class="search-title">{{ item.title }}</span>
+                          <a
+                            v-if="item.source"
+                            class="search-source"
+                            :href="item.link"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >{{ item.source }}</a>
+                          <p v-if="item.snippet" class="search-field">
+                            <span class="field-label">摘要：</span>{{ item.snippet }}
+                          </p>
+                          <p v-if="item.highlights.length" class="search-field">
+                            <span class="field-label">高亮关键词：</span>{{ item.highlights.join('、') }}
+                          </p>
+                        </div>
+                      </div>
+
+                      <!-- scrapeWebPage：网页卡片，点击地址新窗口打开 -->
+                      <div v-else-if="block.type === 'webpage'" class="tool-block">
+                        <div class="tool-title">Step {{ block.step }} · 🌐 工具 {{ block.tool }} · 网页内容</div>
+                        <p class="webpage-line">
+                          <span class="field-label">网页标题：</span>{{ block.title || '（未识别）' }}
+                        </p>
+                        <p class="webpage-line">
+                          <span class="field-label">网页地址：</span>
+                          <a
+                            v-if="block.url"
+                            :href="block.url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >点击打开网页 ↗</a>
+                          <span v-else>（未识别）</span>
+                        </p>
+                        <p class="webpage-excerpt">{{ block.excerpt }}</p>
+                      </div>
+
+                      <!-- 其他工具：纯文本展示 -->
+                      <div v-else class="tool-block">
+                        <div class="tool-title">Step {{ block.step }} · 🛠️ 工具 {{ block.tool }} 返回的结果</div>
+                        <div class="seg-text">{{ block.text }}</div>
+                      </div>
+                    </template>
+                  </div>
+                  <!-- 其余情况：纯文本（流式输出中 / 用户消息 / 错误提示），\n 统一转为真实换行 -->
+                  <div v-else class="bubble-text">{{ displayText(msg.content) }}</div>
                   <!-- AI 正在输出时的打字动画 -->
                   <div v-if="msg.loading && !msg.content" class="typing">
                     <i></i><i></i><i></i>
@@ -799,6 +1038,110 @@ onBeforeUnmount(() => {
   line-height: 1.75;
   /* AI 与用户的文字统一在气泡内左对齐 */
   text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---------- 工具结果富文本（AI 超级智能体步骤日志） ---------- */
+.rich-text {
+  min-width: 320px;
+}
+
+.seg-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-block {
+  margin: 8px 0;
+}
+
+.tool-title {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--page-accent);
+}
+
+.field-label {
+  color: #8a93a6;
+}
+
+/* searchWeb 搜索结果卡片 */
+.search-item {
+  padding: 10px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+}
+
+/* 多条结果之间间隔一行 */
+.search-item + .search-item {
+  margin-top: 16px;
+}
+
+.search-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--page-accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+a.search-title:hover {
+  text-decoration: underline;
+}
+
+.search-source {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: #16a34a;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.search-source:hover {
+  text-decoration: underline;
+}
+
+.search-field {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #4b5563;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* scrapeWebPage 网页卡片 */
+.webpage-line {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.webpage-line a {
+  font-weight: 600;
+  color: var(--page-accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.webpage-line a:hover {
+  text-decoration: underline;
+}
+
+.webpage-excerpt {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #4b5563;
+  background: #f7f8fa;
+  border-radius: 8px;
   white-space: pre-wrap;
   word-break: break-word;
 }
