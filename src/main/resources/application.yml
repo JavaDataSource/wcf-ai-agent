@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: wcf-ai-agent
+  profiles:
+    active: local
+# 临时注释掉，便于开发调试和部署（实际填写 PgVector 数据库信息）
+#  datasource:
+#    url: xxx
+#    username: root
+#    password: 123456
+  ai:
+    dashscope:
+      # 需要替换为你自己的 key
+      api-key: your-api-key
+      chat:
+        options:
+          model: qwen-plus-latest
+      embedding:
+        options:
+          model: text-embedding-v3
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: gemma3:1b
+# 临时注释掉，便于开发调试和部署（实际需要启动 MCP 服务；含密钥的个人连接
+# 配置在 application-local.yml 的 spring.ai.mcp.client.stdio.connections 中，
+# 应用启动时会和这里的 classpath:mcp-servers.json 合并，本地配置优先）
+#    mcp:
+#      client:
+#        sse:
+#          connections:
+#            server1:
+#              url: http://localhost:8127
+#        stdio:
+#          servers-configuration: classpath:mcp-servers.json
+# 临时注释掉，便于大家开发调试和部署（实际需要启动 PgVector 数据库）
+#    vectorstore:
+#      pgvector:
+#        index-type: HNSW
+#        dimensions: 1536
+#        distance-type: COSINE_DISTANCE
+#        max-document-batch-size: 10000 # Optional: Maximum number of documents per batch
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+# springdoc-openapi 项目文档配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.wcf.wcfaiagent.controller
+# knife4j的增强配置，不需要增强可以不配
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+# searchApi
+search-api:
+  # 需要替换为你自己的 key
+  api-key: 你的 API Key
+# 修改日志级别，查看 Spring AI 更多调用细节
+logging:
+  level:
+    org.springframework.ai: DEBUG
+
