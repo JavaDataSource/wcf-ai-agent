@@ -568,6 +568,13 @@ onBeforeUnmount(() => {
 
           <!-- 聊天记录：用户在右，AI 在左 -->
           <section ref="messageListRef" class="chat-messages">
+            <!-- 恋爱主题：新会话氛围引言（治愈系，开始对话后自动隐去） -->
+            <div v-if="isLoveTheme && messages.length <= 1" class="mood-quote">
+              <span class="mood-star" aria-hidden="true">✦</span>
+              <p class="mood-line">答应我，别再画地为牢了好吗</p>
+              <p class="mood-sub">来我怀里，给你拥抱 —— 走出门去，看看星星</p>
+              <p class="mood-src">陈璎璨 ·《去看看星星好不好》</p>
+            </div>
             <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="msg.role">
               <div class="avatar" :class="msg.role">
                 <!-- AI 默认头像：Manus 用机器人、恋爱大师用爱心；用户展示“你” -->
@@ -719,6 +726,89 @@ onBeforeUnmount(() => {
   --chip-color: #d95d75;
   --input-border: #f6d3da;
   --divider: #f9e8ec;
+}
+
+/* ---------- 恋爱主题：新会话氛围引言（治愈系 · 画地为牢） ---------- */
+.mood-quote {
+  margin: 28px auto 4px;
+  max-width: 400px;
+  padding: 20px 28px 16px;
+  text-align: center;
+  border-radius: 18px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 233, 238, 0.6) 0%,
+    rgba(255, 243, 233, 0.6) 100%
+  );
+  border: 1px solid rgba(242, 109, 126, 0.16);
+  box-shadow: 0 14px 32px rgba(242, 109, 126, 0.09);
+  animation: mood-float 5.5s ease-in-out infinite;
+}
+
+.mood-star {
+  display: inline-block;
+  font-size: 14px;
+  color: #f5a69b;
+  text-shadow: 0 0 10px rgba(247, 167, 108, 0.55);
+  animation: mood-twinkle 2.4s ease-in-out infinite;
+}
+
+.mood-line {
+  margin: 6px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #b5485d;
+}
+
+.mood-line::before,
+.mood-line::after {
+  color: rgba(242, 109, 126, 0.4);
+  font-weight: 400;
+}
+
+.mood-line::before {
+  content: '「';
+}
+
+.mood-line::after {
+  content: '」';
+}
+
+.mood-sub {
+  margin: 9px 0 0;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #c98995;
+}
+
+.mood-src {
+  margin: 10px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: #dfa9b6;
+}
+
+@keyframes mood-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes mood-twinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
 }
 
 /* ---------- 外壳卡片 ---------- */
