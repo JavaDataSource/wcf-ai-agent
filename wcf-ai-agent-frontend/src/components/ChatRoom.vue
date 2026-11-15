@@ -43,6 +43,21 @@ const props = defineProps({
 
 const isLoveTheme = computed(() => props.theme === 'love')
 
+// ---------- 角色头像（恋爱主题） ----------
+// 豆包生成的角色头像图放在 src/assets/avatars/ 下即可自动启用：
+//   love-ai.png（女生，AI 恋爱大师张知安） / love-user.png（男生，用户）
+// 文件不存在时回退到原有的爱心图标 / 「你」文字头像
+const avatarAssets = import.meta.glob('../assets/avatars/love-*.{png,jpg,jpeg,webp}', {
+  eager: true,
+  import: 'default',
+})
+function findAvatarAsset(keyword) {
+  const hit = Object.entries(avatarAssets).find(([path]) => path.includes(keyword))
+  return hit ? hit[1] : ''
+}
+const loveAiAvatar = findAvatarAsset('love-ai')
+const loveUserAvatar = findAvatarAsset('love-user')
+
 // ---------- 会话管理 ----------
 const { sessions, activeId, messages, createTime, newSession, switchSession, touchSession, syncMessages, init } =
   useSessions(props.appKey, () => props.welcomeMessage)
@@ -521,7 +536,8 @@ onBeforeUnmount(() => {
         <aside class="sidebar">
           <div v-if="isLoveTheme" class="brand">
             <div class="brand-logo">
-              <AppIcon type="heart" :size="24" />
+              <img v-if="loveAiAvatar" class="role-avatar-img" :src="loveAiAvatar" alt="张知安" />
+              <AppIcon v-else type="heart" :size="24" />
             </div>
             <div class="brand-text">
               <h1>{{ title }}</h1>
@@ -547,6 +563,14 @@ onBeforeUnmount(() => {
             </li>
           </ul>
 
+          <!-- 恋爱主题：治愈系氛围引言（固定在返回主页上方） -->
+          <div v-if="isLoveTheme" class="mood-quote">
+            <span class="mood-star" aria-hidden="true">✦</span>
+            <p class="mood-line">答应我，别再画地为牢了好吗</p>
+            <p class="mood-sub">来我怀里，给你拥抱 —— 走出门去，看看星星</p>
+            <p class="mood-src">陈璎璨 ·《去看看星星好不好》</p>
+          </div>
+
           <router-link class="home-link" to="/">🏠 返回主页</router-link>
         </aside>
 
@@ -568,17 +592,16 @@ onBeforeUnmount(() => {
 
           <!-- 聊天记录：用户在右，AI 在左 -->
           <section ref="messageListRef" class="chat-messages">
-            <!-- 恋爱主题：新会话氛围引言（治愈系，开始对话后自动隐去） -->
-            <div v-if="isLoveTheme && messages.length <= 1" class="mood-quote">
-              <span class="mood-star" aria-hidden="true">✦</span>
-              <p class="mood-line">答应我，别再画地为牢了好吗</p>
-              <p class="mood-sub">来我怀里，给你拥抱 —— 走出门去，看看星星</p>
-              <p class="mood-src">陈璎璨 ·《去看看星星好不好》</p>
-            </div>
             <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="msg.role">
               <div class="avatar" :class="msg.role">
-                <!-- AI 默认头像：Manus 用机器人、恋爱大师用爱心；用户展示“你” -->
-                <AppIcon v-if="msg.role === 'ai'" :type="isLoveTheme ? 'heart' : 'bot'" :size="20" />
+                <!-- 恋爱主题使用角色头像（AI=女生张知安，用户=男生）；未配置图片时回退到图标/文字 -->
+                <img
+                  v-if="isLoveTheme && (msg.role === 'ai' ? loveAiAvatar : loveUserAvatar)"
+                  class="role-avatar-img"
+                  :src="msg.role === 'ai' ? loveAiAvatar : loveUserAvatar"
+                  :alt="msg.role === 'ai' ? '张知安' : '你'"
+                />
+                <AppIcon v-else-if="msg.role === 'ai'" :type="isLoveTheme ? 'heart' : 'bot'" :size="20" />
                 <template v-else>你</template>
               </div>
               <div class="msg-col">
@@ -728,34 +751,27 @@ onBeforeUnmount(() => {
   --divider: #f9e8ec;
 }
 
-/* ---------- 恋爱主题：新会话氛围引言（治愈系 · 画地为牢） ---------- */
+/* ---------- 恋爱主题：氛围引言（侧边栏底部 · 返回主页上方） ---------- */
 .mood-quote {
-  margin: 28px auto 4px;
-  max-width: 400px;
-  padding: 20px 28px 16px;
+  /* 顶住侧边栏底部，与「返回主页」组成固定组合 */
+  margin-top: auto;
+  padding: 12px 8px 10px;
   text-align: center;
-  border-radius: 18px;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 233, 238, 0.6) 0%,
-    rgba(255, 243, 233, 0.6) 100%
-  );
-  border: 1px solid rgba(242, 109, 126, 0.16);
-  box-shadow: 0 14px 32px rgba(242, 109, 126, 0.09);
-  animation: mood-float 5.5s ease-in-out infinite;
+  /* 无边框、背景与侧边栏同色，融为一体 */
+  background: transparent;
 }
 
 .mood-star {
   display: inline-block;
-  font-size: 14px;
+  font-size: 13px;
   color: #f5a69b;
   text-shadow: 0 0 10px rgba(247, 167, 108, 0.55);
   animation: mood-twinkle 2.4s ease-in-out infinite;
 }
 
 .mood-line {
-  margin: 6px 0 0;
-  font-size: 17px;
+  margin: 5px 0 0;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.5px;
   color: #b5485d;
@@ -776,27 +792,17 @@ onBeforeUnmount(() => {
 }
 
 .mood-sub {
-  margin: 9px 0 0;
-  font-size: 13px;
-  letter-spacing: 1px;
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  letter-spacing: 0.5px;
   color: #c98995;
 }
 
 .mood-src {
-  margin: 10px 0 0;
-  font-size: 11px;
+  margin: 8px 0 0;
+  font-size: 10px;
   letter-spacing: 0.5px;
   color: #dfa9b6;
-}
-
-@keyframes mood-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
 }
 
 @keyframes mood-twinkle {
@@ -884,7 +890,8 @@ onBeforeUnmount(() => {
   padding: 20px 16px 14px;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--divider);
-  overflow-y: auto;
+  /* 历史会话的滚动由 .history-list 内部处理，避免整栏一起滚 */
+  overflow: hidden;
 }
 
 .theme-love .sidebar {
@@ -934,6 +941,29 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* 历史会话过多时仅列表内部滚动，品牌区 / 返回主页保持固定 */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.14) transparent;
+}
+
+.history-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .history-list li {
@@ -1085,6 +1115,20 @@ onBeforeUnmount(() => {
   background: #eef1f6;
   color: var(--page-accent);
   font-size: 13px;
+}
+
+/* 角色头像图（恋爱主题的 AI/用户人物形象）：圆形裁剪、填满头像容器 */
+.role-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.theme-love .role-avatar-img {
+  /* 温柔风：细边光圈，突出人物头像 */
+  box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(242, 109, 126, 0.25);
 }
 
 .theme-love .avatar.user {
@@ -1287,9 +1331,48 @@ a.search-title:hover {
   flex-shrink: 0;
 }
 
-/* love 主题：品牌在侧边栏，输入区只覆盖聊天列 */
-.theme-love .input-area {
-  margin-left: var(--sidebar-w);
+/* love 主题：输入区定位交给网格布局（桌面端），移动端通栏 */
+@media (max-width: 768px) {
+  .theme-love .input-area {
+    margin-left: 0;
+  }
+}
+
+/* love 主题：改为两列网格布局——左列侧边栏贯通卡片底部（与输入区并排），
+   右列为聊天 + 输入区。shell-body 降级为透明容器（display: contents），
+   其子元素直接参与网格定位 */
+@media (min-width: 769px) {
+  .theme-love .shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'sidebar main'
+      'sidebar input';
+  }
+
+  .theme-love .shell-body {
+    display: contents;
+  }
+
+  .theme-love .sidebar {
+    grid-area: sidebar;
+    /* 底部留白与输入区的下内边距（20px）一致，保证「返回主页」与输入框底部平齐 */
+    padding-bottom: 20px;
+  }
+
+  .theme-love .main {
+    grid-area: main;
+  }
+
+  .theme-love .input-area {
+    grid-area: input;
+  }
+
+  /* 引言的 margin-top: auto 负责把「引言 + 返回主页」顶到侧边栏底部 */
+  .theme-love .home-link {
+    margin-top: 6px;
+  }
 }
 
 .chips {
@@ -1420,10 +1503,6 @@ a.search-title:hover {
   /* 手机/小平板：隐藏侧边栏，会话操作走顶部按钮 */
   .sidebar {
     display: none;
-  }
-
-  .theme-love .input-area {
-    margin-left: 0;
   }
 
   .home-btn {

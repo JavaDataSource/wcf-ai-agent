@@ -24,10 +24,10 @@ function createEventSource(message, chatId) {
     theme="love"
     app-key="loveApp"
     title="AI 恋爱大师"
-    subtitle="你的专属情感顾问"
+    subtitle="你的专属情感顾问-张知安"
     tagline="温柔风 · 有情绪回应"
     input-placeholder="输入你的问题，慢慢说都可以"
-    welcome-message="你好呀，我是你的专属恋爱大师 💘 无论是脱单技巧、约会攻略、情感困惑，还是想让我帮你写表白情书，都可以直接跟我说～"
+    welcome-message="你好呀，我是你的专属恋爱大师张知安 💘 无论是脱单技巧、约会攻略、情感困惑，还是想让我帮你写表白情书，都可以直接跟我说～"
     :quick-prompts="[
       '帮我写一段打动人的表白情书',
       '第一次约会应该注意什么？',
