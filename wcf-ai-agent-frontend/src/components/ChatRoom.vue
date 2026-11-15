@@ -59,7 +59,7 @@ const loveAiAvatar = findAvatarAsset('love-ai')
 const loveUserAvatar = findAvatarAsset('love-user')
 
 // ---------- 会话管理 ----------
-const { sessions, activeId, messages, createTime, newSession, switchSession, touchSession, syncMessages, init } =
+const { sessions, activeId, messages, createTime, newSession, switchSession, removeSession, touchSession, syncMessages, init } =
   useSessions(props.appKey, () => props.welcomeMessage)
 
 init()
@@ -307,6 +307,28 @@ function handleQuickPrompt(prompt) {
   }
   userInput.value = prompt
   handleSend()
+}
+
+// ---------- 删除历史会话 ----------
+const deleteTarget = ref(null) // 待确认删除的会话
+
+/** 点击会话条目右上角的叉按钮：弹出确认框 */
+function confirmDeleteSession(session) {
+  deleteTarget.value = session
+}
+
+/** 确认删除：若删除的是正在输出的当前会话，先结束本轮对话 */
+async function handleDeleteSession() {
+  const target = deleteTarget.value
+  if (!target) {
+    return
+  }
+  deleteTarget.value = null
+  if (target.id === activeId.value) {
+    finalizeStream()
+  }
+  await removeSession(target.id)
+  scrollToBottom()
 }
 
 /** 输入框高度自适应（最多 160px） */
@@ -560,6 +582,16 @@ onBeforeUnmount(() => {
             >
               <span class="history-title">{{ session.title }}</span>
               <span class="history-meta">{{ session.time }}</span>
+              <!-- 右上角删除按钮：hover 显示，点击不触发会话切换 -->
+              <button
+                class="session-delete"
+                type="button"
+                title="删除会话"
+                aria-label="删除会话"
+                @click.stop="confirmDeleteSession(session)"
+              >
+                ×
+              </button>
             </li>
           </ul>
 
@@ -707,6 +739,21 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </footer>
+    </div>
+
+    <!-- 删除会话确认弹窗 -->
+    <div v-if="deleteTarget" class="modal-mask" @click.self="deleteTarget = null">
+      <div class="modal-card">
+        <p class="modal-title">删除会话</p>
+        <p class="modal-text">
+          确定要删除「{{ deleteTarget.title }}」吗？<br />
+          该会话的全部聊天记录将从数据库中删除，且无法恢复。
+        </p>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" type="button" @click="deleteTarget = null">取消</button>
+          <button class="modal-btn danger" type="button" @click="handleDeleteSession">删除</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -967,10 +1014,42 @@ onBeforeUnmount(() => {
 }
 
 .history-list li {
-  padding: 12px 14px;
+  position: relative;
+  padding: 12px 30px 12px 14px;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+/* 右上角删除按钮：默认隐藏，hover 会话条目时显现 */
+.session-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: #9aa1ac;
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.history-list li:hover .session-delete,
+.session-delete:focus-visible {
+  opacity: 1;
+}
+
+.session-delete:hover {
+  color: #fff;
+  background: #e5484d;
 }
 
 .theme-manus .history-list li:hover {
@@ -1481,6 +1560,76 @@ a.search-title:hover {
 .home-btn:hover {
   border-color: var(--page-accent);
   color: var(--page-accent);
+}
+
+/* ---------- 删除会话确认弹窗 ---------- */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 32, 38, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal-card {
+  width: min(360px, calc(100vw - 48px));
+  padding: 22px 24px 18px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2b3240;
+}
+
+.modal-text {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #5a6270;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-btn.cancel {
+  border: 1px solid #dde2ea;
+  color: #5a6270;
+  background: #fff;
+}
+
+.modal-btn.cancel:hover {
+  border-color: var(--page-accent);
+  color: var(--page-accent);
+}
+
+.modal-btn.danger {
+  border: none;
+  color: #fff;
+  background: #e5484d;
+}
+
+.modal-btn.danger:hover {
+  background: #d63b40;
 }
 
 /* ---------- 小屏适配 ---------- */

@@ -2,6 +2,7 @@ import { ref } from 'vue'
 
 import {
   createSession as apiCreateSession,
+  deleteSession as apiDeleteSession,
   getSessionMessages,
   listSessions,
   saveSessionMessages,
@@ -153,6 +154,37 @@ export function useSessions(appKey, buildWelcome) {
     await loadMessages(id)
   }
 
+  /**
+   * 删除会话：调用后端删除（连同其全部消息从数据库删除）；
+   * 删除的是当前会话时自动切到列表第一个会话，列表为空则新建。
+   * 后端删除失败时保留界面条目（避免下次进入“复活”），仅降级本地会话直接移除。
+   */
+  async function removeSession(id) {
+    const session = sessions.value.find((s) => s.id === id)
+    if (!session) {
+      return
+    }
+    if (!session.local) {
+      try {
+        await apiDeleteSession(id)
+      } catch (error) {
+        console.warn('[删除会话失败]', error?.message || error)
+        return
+      }
+    }
+    sessions.value = sessions.value.filter((s) => s.id !== id)
+    if (activeId.value === id) {
+      // 先清空当前会话，避免 switchSession 里把残留消息同步回已删除的会话
+      activeId.value = ''
+      lastSyncedIndex = 0
+      if (sessions.value.length) {
+        await switchSession(sessions.value[0].id)
+      } else {
+        await newSession()
+      }
+    }
+  }
+
   /** 会话有新动态：置顶排序；首个用户消息到来时更新标题（后端同步落库） */
   async function touchSession(firstUserMessage) {
     const session = sessions.value.find((s) => s.id === activeId.value)
@@ -198,5 +230,5 @@ export function useSessions(appKey, buildWelcome) {
     }
   }
 
-  return { sessions, activeId, messages, createTime, newSession, switchSession, touchSession, syncMessages, init }
+  return { sessions, activeId, messages, createTime, newSession, switchSession, removeSession, touchSession, syncMessages, init }
 }
